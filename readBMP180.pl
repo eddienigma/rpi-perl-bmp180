@@ -66,3 +66,24 @@ my cal_MD	= 0;
 # from the sensor, but these methods don't differentiate between signed and
 # unsigned values. We need to create our own functions to read signed values
 # and handle them correctly.
+
+sub readS8 {
+	my ($bmp180,$register) = @_;
+	my $readVal = $bmp180->readByteData($register);
+	if($readVal > 127) {
+		$readVal -= 256;
+	}
+	return $readVal;
+}
+
+sub readS16 {
+	my ($bmp180,$register) = @_;
+	my $readValHi = $bmp180->readByteData($register);
+	if($readValHi > 127) {
+                $readValHi -= 256;
+        }
+	my $readValLo = $bmp180->readByteData($register+1);
+	my $retVal = ($readValHi << 8) + $readValLo;
+	return $retVal;
+}
+
