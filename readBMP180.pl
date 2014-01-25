@@ -87,3 +87,17 @@ sub readS16 {
 	return $retVal;
 }
 
+# Read the calibration data from the sensor's eeprom and store it locally
+
+cal_AC1 = readS16($bmp180,BMP180_CAL_AC1);
+cal_AC2 = readS16($bmp180,BMP180_CAL_AC2);
+cal_AC3 = readS16($bmp180,BMP180_CAL_AC3);
+cal_AC4 = readS16($bmp180,BMP180_CAL_AC4);
+cal_AC5 = readS16($bmp180,BMP180_CAL_AC5);
+cal_AC6 = readS16($bmp180,BMP180_CAL_AC6);
+cal_B1  = readS16($bmp180,BMP180_CAL_B1);
+cal_B2  = readS16($bmp180,BMP180_CAL_B2);
+cal_MB  = readS16($bmp180,BMP180_CAL_MB);
+cal_MC  = readS16($bmp180,BMP180_CAL_MC);
+cal_MD  = readS16($bmp180,BMP180_CAL_MD);
+
