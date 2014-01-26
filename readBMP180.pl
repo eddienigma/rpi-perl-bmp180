@@ -16,7 +16,7 @@ use Device::SMBus;
 
 my $bmp180 = Device::SMBus->new(
   I2CBusDevicePath => '/dev/i2c-1',
-  I2CDeviceAddress => 0x77
+  I2CDeviceAddress => 0x77,
 );
 
 # Define a standard list of operating modes for the sensor.
@@ -50,17 +50,17 @@ use constant BMP180_READPRESSURECMD	=> 0x34;
 
 # Define a list of variables to store the calibration data into.
 
-my cal_AC1	= 0;
-my cal_AC2	= 0;
-my cal_AC3	= 0;
-my cal_AC4	= 0;
-my cal_AC5	= 0;
-my cal_AC6	= 0;
-my cal_B1	= 0;
-my cal_B2	= 0;
-my cal_MB	= 0;
-my cal_MC	= 0;
-my cal_MD	= 0;
+my $cal_AC1	= 0;
+my $cal_AC2	= 0;
+my $cal_AC3	= 0;
+my $cal_AC4	= 0;
+my $cal_AC5	= 0;
+my $cal_AC6	= 0;
+my $cal_B1	= 0;
+my $cal_B2	= 0;
+my $cal_MB	= 0;
+my $cal_MC	= 0;
+my $cal_MD	= 0;
 
 # The Device::SMBus module provides methods for reading 8 and 16 bit values
 # from the sensor, but these methods don't differentiate between signed and
@@ -79,25 +79,42 @@ sub readS8 {
 sub readS16 {
 	my ($bmp180,$register) = @_;
 	my $readValHi = $bmp180->readByteData($register);
-	if($readValHi > 127) {
-                $readValHi -= 256;
-        }
 	my $readValLo = $bmp180->readByteData($register+1);
-	my $retVal = ($readValHi << 8) + $readValLo;
+	my $bufferHi = $readValHi & 0x7F;
+	$bufferHi *= 256;
+	my $buffer = $bufferHi + $readValLo;
+	if ($readValHi & 0x80) {
+		$buffer *= -1;
+	}
+	my $retVal = $buffer;
 	return $retVal;
 }
 
 # Read the calibration data from the sensor's eeprom and store it locally
 
-cal_AC1 = readS16($bmp180,BMP180_CAL_AC1);
-cal_AC2 = readS16($bmp180,BMP180_CAL_AC2);
-cal_AC3 = readS16($bmp180,BMP180_CAL_AC3);
-cal_AC4 = readS16($bmp180,BMP180_CAL_AC4);
-cal_AC5 = readS16($bmp180,BMP180_CAL_AC5);
-cal_AC6 = readS16($bmp180,BMP180_CAL_AC6);
-cal_B1  = readS16($bmp180,BMP180_CAL_B1);
-cal_B2  = readS16($bmp180,BMP180_CAL_B2);
-cal_MB  = readS16($bmp180,BMP180_CAL_MB);
-cal_MC  = readS16($bmp180,BMP180_CAL_MC);
-cal_MD  = readS16($bmp180,BMP180_CAL_MD);
+$cal_AC1 = readS16($bmp180,BMP180_CAL_AC1);
+$cal_AC2 = readS16($bmp180,BMP180_CAL_AC2);
+$cal_AC3 = readS16($bmp180,BMP180_CAL_AC3);
+$cal_AC4 = $bmp180->readWordData(BMP180_CAL_AC4);
+$cal_AC5 = $bmp180->readWordData(BMP180_CAL_AC5);
+$cal_AC6 = $bmp180->readWordData(BMP180_CAL_AC6);
+$cal_B1  = readS16($bmp180,BMP180_CAL_B1);
+$cal_B2  = readS16($bmp180,BMP180_CAL_B2);
+$cal_MB  = readS16($bmp180,BMP180_CAL_MB);
+$cal_MC  = readS16($bmp180,BMP180_CAL_MC);
+$cal_MD  = readS16($bmp180,BMP180_CAL_MD);
 
+# DIAG: Print out the calibration data to validate that we're working up to this point
+print "Calibration Data\n";
+print "----------------\n";
+printf "AC1 = %6d\n",$cal_AC1;
+printf "AC2 = %6d\n",$cal_AC2;
+printf "AC3 = %6d\n",$cal_AC3;
+printf "AC4 = %6d\n",$cal_AC4;
+printf "AC5 = %6d\n",$cal_AC5;
+printf "AC6 = %6d\n",$cal_AC6;
+printf "B1 = %6d\n",$cal_B1;
+printf "B2 = %6d\n",$cal_B2;
+printf "MB = %6d\n",$cal_MB;
+printf "MC = %6d\n",$cal_MC;
+printf "MD = %6d\n",$cal_MD;
