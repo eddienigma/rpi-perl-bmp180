@@ -7,6 +7,7 @@
 # pressure from an Adafruit BMP180 breakout board.
 
 use Device::SMBus;
+use Time::HeRes;
 
 
 # Instantiate an SMBus object referring to the correct I2C bus
@@ -118,3 +119,16 @@ printf "B2 = %6d\n",$cal_B2;
 printf "MB = %6d\n",$cal_MB;
 printf "MC = %6d\n",$cal_MC;
 printf "MD = %6d\n",$cal_MD;
+
+# Read the raw (uncompensated) temperature from the sensor
+
+sub readRawTemp {
+	my $bmp180 = @_;
+	$bmp180->writeByteData(BMP180_CONTROL,BMP180_READTEMPCMD);
+	usleep(5);
+	my $rawTemp = $bmp180->readWordData(BMP180_TEMPDATA);
+	printf "Raw temperature value is 0x%04X (%d)", $rawTemp & 0xFFFF, $rawTemp;
+	return $rawTemp;
+}
+
+
