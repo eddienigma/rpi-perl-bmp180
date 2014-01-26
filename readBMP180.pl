@@ -131,4 +131,29 @@ sub readRawTemp {
 	return $rawTemp;
 }
 
+# Read the raw (uncompensated) barometric pressure from the sensor
+
+sub readRawPressure {
+	my ($bmp180,$mode) = @_;
+	my $writeVal = BMP180_READPRESSURECMD + ($mode << 6);
+	$bmp180->writeByteData(BMP180_CONTROL,$writeVal);
+	if ($mode == BMP180_ULTRALOWPOWER_ {
+		usleep(5);
+	}
+	elseif ($mode == BMP180_HIRES) {
+		usleep(14);
+	}
+	elseif ($mode == BMP180_ULTRAHIRES) {
+		usleep(26);
+	}
+	else {
+		usleep(8);
+	}
+	my $msb = $bmp180->readByteData(BMP180_PRESSUREDATA);
+	my $lsb = $bmp180->readByteData(BMP180_PRESSUREDATA+);
+	my $xlsb = $bmp180->readByteData(BMP180_PRESSUREDATA+2);
+	my $rawPressure = (($msb << 16) + ($lsb << 8) + $xlsb) >> (8 - $mode);
+	printf "Raw pressure value is 0x%04X (%d)", $rawPressure & 0xFFFF, $rawPressure;
+	return $rawPressure;
+}
 
