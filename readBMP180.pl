@@ -127,7 +127,7 @@ sub readRawTemp {
 	$bmp180->writeByteData(BMP180_CONTROL,BMP180_READTEMPCMD);
 	usleep(5);
 	my $rawTemp = $bmp180->readWordData(BMP180_TEMPDATA);
-	printf "Raw temperature value is 0x%04X (%d)", $rawTemp & 0xFFFF, $rawTemp;
+	printf "Raw temperature value is 0x%04X (%d)\n", $rawTemp & 0xFFFF, $rawTemp;
 	return $rawTemp;
 }
 
@@ -153,7 +153,20 @@ sub readRawPressure {
 	my $lsb = $bmp180->readByteData(BMP180_PRESSUREDATA+);
 	my $xlsb = $bmp180->readByteData(BMP180_PRESSUREDATA+2);
 	my $rawPressure = (($msb << 16) + ($lsb << 8) + $xlsb) >> (8 - $mode);
-	printf "Raw pressure value is 0x%04X (%d)", $rawPressure & 0xFFFF, $rawPressure;
+	printf "Raw pressure value is 0x%04X (%d)\n", $rawPressure & 0xFFFF, $rawPressure;
 	return $rawPressure;
+}
+
+# Read the raw temperature and apply the compensation values
+
+sub readTemp {
+	my ($bmp180,$mode) = @_;
+	my $UT = readRawTemp($bmp180,$mode);
+	my $X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
+	my $X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
+	my $B5 = $X1 + $X2;
+	my $temp = (($B5 + 8) >> 4) / 10.0;
+	printf "Calibrated temperature = %f C\n", $temp;
+	return $temp;
 }
 
