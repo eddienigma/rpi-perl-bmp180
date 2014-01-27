@@ -157,11 +157,11 @@ sub readRawPressure {
 	return $rawPressure;
 }
 
-# Read the raw temperature and apply the compensation values
+# Read the compensated temperature
 
 sub readTemp {
-	my ($bmp180,$mode) = @_;
-	my $UT = readRawTemp($bmp180,$mode);
+	my ($bmp180) = @_;
+	my $UT = readRawTemp($bmp180);
 	my $X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
 	my $X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
 	my $B5 = $X1 + $X2;
@@ -170,3 +170,41 @@ sub readTemp {
 	return $temp;
 }
 
+# Read the compansated barometric pressure
+
+sub readPressure {
+	my ($bmp180,$mode) = @_;
+	my $UT = readRawTemp($bmp180);
+	my $UP = readRawPressure($bmp180,$mode);
+
+	# Calculate true temperature, but don't convert to simple output format yet
+	my $X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
+	my $X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
+	my $B5 = $X1 + $X2;
+	my $temp = (($B5 + 8) >> 4) / 10.0;
+	printf "Calibrated temperature = %f C\n", $temp;
+
+	# Calculate compensated pressure
+	my $B6 = $B5 - 4000;
+	$X1 = ($cal_B2 * ($B6 * $B6) >> 12) >> 11;
+	$X2 = ($cal_AC2 * $B6) >> 11;
+	my $X3 = $X1 + $X2;
+	my $B3 = ((($cal_AC1 * 4 + $X3) << $mode) + 2) /4;
+	$X1 = ($cal_AC3 * $B6) >> 13;
+	$X2 = ($cal_B1 * (($B6 * $B6) >> 12 ) >> 16;
+	$X3 = (($X1 + $X2) + 2) >> 2;
+	my $B4 = ($cal_AC4 * ($X3 + 32768)) >> 15;
+	my $B7 = ($UP - $B3) * (50000 >> $mode);
+	my $p = 0;
+	if ($B7 < 0x80000000) {
+		$p = ($B7 * 2) / $B4;
+	} else {
+		$p = ($B7 / $B4) * 2;
+	}
+	$X1 = ($p >> 8) * ($p >> 8);
+	$X1 = ($X1 * 3038) >> 16;
+	$X2 = (-7357 * $p) >> 16;
+	$p = $p + (($X1 + $X2 + 3791) >> 4);
+	printf "Calibration pressure is %d Pa\n", $p;
+	return $p;
+}
