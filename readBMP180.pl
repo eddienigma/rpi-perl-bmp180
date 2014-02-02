@@ -7,7 +7,9 @@
 # pressure from an Adafruit BMP180 breakout board.
 
 use Device::SMBus;
-use Time::HeRes;
+use Time::HiRes qw( usleep ualarm gettimeofday tv_interval nanosleep
+		    clock_gettime clock_getres clock_nanosleep clock
+		    stat );
 
 
 # Instantiate an SMBus object referring to the correct I2C bus
@@ -79,15 +81,19 @@ sub readS8 {
 
 sub readS16 {
 	my ($bmp180,$register) = @_;
-	my $readValHi = $bmp180->readByteData($register);
+	my $readValHi = readS8($bmp180,$register);
 	my $readValLo = $bmp180->readByteData($register+1);
-	my $bufferHi = $readValHi & 0x7F;
-	$bufferHi *= 256;
-	my $buffer = $bufferHi + $readValLo;
-	if ($readValHi & 0x80) {
-		$buffer *= -1;
-	}
-	my $retVal = $buffer;
+	my $bufferHi = $readValHi << 8;
+	my $retVal = $bufferHi + $readValLo;
+	return $retVal;
+}
+
+sub readU16 {
+	my ($bmp180,$register) = @_;
+        my $readValHi = $bmp180->readByteData($register);
+        my $readValLo = $bmp180->readByteData($register+1);
+	my $bufferHi = $readValHi << 8;
+	my $retVal = $bufferHi + $readValLo;
 	return $retVal;
 }
 
@@ -96,9 +102,9 @@ sub readS16 {
 $cal_AC1 = readS16($bmp180,BMP180_CAL_AC1);
 $cal_AC2 = readS16($bmp180,BMP180_CAL_AC2);
 $cal_AC3 = readS16($bmp180,BMP180_CAL_AC3);
-$cal_AC4 = $bmp180->readWordData(BMP180_CAL_AC4);
-$cal_AC5 = $bmp180->readWordData(BMP180_CAL_AC5);
-$cal_AC6 = $bmp180->readWordData(BMP180_CAL_AC6);
+$cal_AC4 = readU16($bmp180,BMP180_CAL_AC4);
+$cal_AC5 = readU16($bmp180,BMP180_CAL_AC5);
+$cal_AC6 = readU16($bmp180,BMP180_CAL_AC6);
 $cal_B1  = readS16($bmp180,BMP180_CAL_B1);
 $cal_B2  = readS16($bmp180,BMP180_CAL_B2);
 $cal_MB  = readS16($bmp180,BMP180_CAL_MB);
@@ -106,28 +112,29 @@ $cal_MC  = readS16($bmp180,BMP180_CAL_MC);
 $cal_MD  = readS16($bmp180,BMP180_CAL_MD);
 
 # DIAG: Print out the calibration data to validate that we're working up to this point
-print "Calibration Data\n";
-print "----------------\n";
-printf "AC1 = %6d\n",$cal_AC1;
-printf "AC2 = %6d\n",$cal_AC2;
-printf "AC3 = %6d\n",$cal_AC3;
-printf "AC4 = %6d\n",$cal_AC4;
-printf "AC5 = %6d\n",$cal_AC5;
-printf "AC6 = %6d\n",$cal_AC6;
-printf "B1 = %6d\n",$cal_B1;
-printf "B2 = %6d\n",$cal_B2;
-printf "MB = %6d\n",$cal_MB;
-printf "MC = %6d\n",$cal_MC;
-printf "MD = %6d\n",$cal_MD;
+#print "Calibration Data\n";
+#print "----------------\n";
+#printf "AC1 = %6d\n",$cal_AC1;
+#printf "AC2 = %6d\n",$cal_AC2;
+#printf "AC3 = %6d\n",$cal_AC3;
+#printf "AC4 = %6d\n",$cal_AC4;
+#printf "AC5 = %6d\n",$cal_AC5;
+#printf "AC6 = %6d\n",$cal_AC6;
+#printf "B1 = %6d\n",$cal_B1;
+#printf "B2 = %6d\n",$cal_B2;
+#printf "MB = %6d\n",$cal_MB;
+#printf "MC = %6d\n",$cal_MC;
+#printf "MD = %6d\n",$cal_MD;
 
 # Read the raw (uncompensated) temperature from the sensor
 
 sub readRawTemp {
-	my $bmp180 = @_;
+	my ($bmp180) = @_;
 	$bmp180->writeByteData(BMP180_CONTROL,BMP180_READTEMPCMD);
 	usleep(5);
-	my $rawTemp = $bmp180->readWordData(BMP180_TEMPDATA);
-	printf "Raw temperature value is 0x%04X (%d)\n", $rawTemp & 0xFFFF, $rawTemp;
+	my $rawTemp = readU16($bmp180,BMP180_TEMPDATA);
+	my $temp = $rawTemp & 0xFFFF;
+	printf "Raw Temp: 0x%x (%d)\n", $temp, $rawTemp;
 	return $rawTemp;
 }
 
@@ -137,23 +144,24 @@ sub readRawPressure {
 	my ($bmp180,$mode) = @_;
 	my $writeVal = BMP180_READPRESSURECMD + ($mode << 6);
 	$bmp180->writeByteData(BMP180_CONTROL,$writeVal);
-	if ($mode == BMP180_ULTRALOWPOWER_ {
+	if ($mode == BMP180_ULTRALOWPOWER) {
 		usleep(5);
 	}
-	elseif ($mode == BMP180_HIRES) {
+	elsif ($mode == BMP180_HIRES) {
 		usleep(14);
 	}
-	elseif ($mode == BMP180_ULTRAHIRES) {
+	elsif ($mode == BMP180_ULTRAHIRES) {
 		usleep(26);
 	}
 	else {
 		usleep(8);
 	}
 	my $msb = $bmp180->readByteData(BMP180_PRESSUREDATA);
-	my $lsb = $bmp180->readByteData(BMP180_PRESSUREDATA+);
+	my $lsb = $bmp180->readByteData(BMP180_PRESSUREDATA+1);
 	my $xlsb = $bmp180->readByteData(BMP180_PRESSUREDATA+2);
 	my $rawPressure = (($msb << 16) + ($lsb << 8) + $xlsb) >> (8 - $mode);
-	printf "Raw pressure value is 0x%04X (%d)\n", $rawPressure & 0xFFFF, $rawPressure;
+	my $press =  $rawPressure & 0xFFFF;
+	#printf "Raw pressure value is 0x%X (%d)\n", $press, $rawPressure;
 	return $rawPressure;
 }
 
@@ -161,12 +169,25 @@ sub readRawPressure {
 
 sub readTemp {
 	my ($bmp180) = @_;
-	my $UT = readRawTemp($bmp180);
-	my $X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
-	my $X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
-	my $B5 = $X1 + $X2;
-	my $temp = (($B5 + 8) >> 4) / 10.0;
-	printf "Calibrated temperature = %f C\n", $temp;
+	my $UT = 0;
+	my $X1 = 0;
+	my $X2 = 0;
+	my $B5 = 0;
+	my $temp = 0.0;
+
+	printf "AC5 = %6d\n",$cal_AC5;
+	printf "AC6 = %6d\n",$cal_AC6;
+	printf "MC = %6d\n",$cal_MC;
+	printf "MD = %6d\n",$cal_MD;
+
+	$UT = readRawTemp($bmp180);
+	$X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
+	$X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
+	$B5 = $X1 + $X2;
+	$temp = (($B5 + 8) >> 4) / 10.0;
+        my $tmp = $UT & 0xFFFF;
+        printf "Raw Tmp: 0x%x (%d)\n", $tmp, $UT;
+	printf "temp var is %f\n", $temp;
 	return $temp;
 }
 
@@ -182,7 +203,7 @@ sub readPressure {
 	my $X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
 	my $B5 = $X1 + $X2;
 	my $temp = (($B5 + 8) >> 4) / 10.0;
-	printf "Calibrated temperature = %f C\n", $temp;
+	#printf "Calibrated temperature = %f C\n", $temp;
 
 	# Calculate compensated pressure
 	my $B6 = $B5 - 4000;
@@ -191,7 +212,7 @@ sub readPressure {
 	my $X3 = $X1 + $X2;
 	my $B3 = ((($cal_AC1 * 4 + $X3) << $mode) + 2) /4;
 	$X1 = ($cal_AC3 * $B6) >> 13;
-	$X2 = ($cal_B1 * (($B6 * $B6) >> 12 ) >> 16;
+	$X2 = ($cal_B1 * (($B6 * $B6)) >> 12 ) >> 16;
 	$X3 = (($X1 + $X2) + 2) >> 2;
 	my $B4 = ($cal_AC4 * ($X3 + 32768)) >> 15;
 	my $B7 = ($UP - $B3) * (50000 >> $mode);
@@ -205,6 +226,23 @@ sub readPressure {
 	$X1 = ($X1 * 3038) >> 16;
 	$X2 = (-7357 * $p) >> 16;
 	$p = $p + (($X1 + $X2 + 3791) >> 4);
-	printf "Calibration pressure is %d Pa\n", $p;
+	#printf "Calibration pressure is %d Pa\n", $p;
 	return $p;
 }
+
+# Print the raw uncorrected temperature
+#my $RawTemp = readRawTemp($bmp180);
+
+# Call the compensated temp function to print temperature
+#my $Temperature = readTemp($bmp180);
+
+
+
+# Call the compensated pressure function to print baromentric pressure
+my $Temperature = readTemp($bmp180);
+#my $Pressure = readPressure($bmp180,BMP180_STANDARD);
+
+printf "Temperature: %f C\n", $Temperature;
+#my $Pressure /= 100.0;
+#printf "Pressure: %f hPa\n", $Pressure;
+
