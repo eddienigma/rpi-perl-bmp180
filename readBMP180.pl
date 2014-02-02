@@ -191,12 +191,24 @@ sub readTemp {
 
 sub readPressure {
 	my ($bmp180,$mode) = @_;
+	my $UT = readRawTemp($bmp180);
 	my $UP = readRawPressure($bmp180,$mode);
+
+	# Calculate true temperature, but don't convert to simple output format yet
+	use integer;	
+	my $X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
+	my $X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
+	my $B5 = $X1 + $X2;
+	no integer;
+	my $temp = (($B5 + 8) >> 4) / 10.0;
+	#printf "Calibrated temperature = %f C\n", $temp;
 
 	# Calculate compensated pressure
 	use integer;	
 	my $B6 = $B5 - 4000;
+	printf "B6 = $B6\n";
 	my $X1 = ($cal_B2 * ($B6 * $B6) >> 12) >> 11;
+	printf "X1 = $X1\n";	
 	my $X2 = ($cal_AC2 * $B6) >> 11;
 	my $X3 = $X1 + $X2;
 	my $B3 = ((($cal_AC1 * 4 + $X3) << $mode) + 2) /4;
