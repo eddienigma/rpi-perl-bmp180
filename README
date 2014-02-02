@@ -1,4 +1,0 @@
-Copyright 2014 by Jason Seymour
-
-  This is an effort to make a Perl script capable of reading a Bosch BMP180 temperature and
-humidity sensor attached to a Raspberry Pi via the I2C bus.

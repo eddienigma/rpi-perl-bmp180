@@ -2,6 +2,7 @@
 
 # Copyright 2014 by Jason Seymour
 # Rev 1.0
+# Rev 1.1 by Jason Miller
 
 # This is a Perl script to read temperature and barometric
 # pressure from an Adafruit BMP180 breakout board.
@@ -21,6 +22,10 @@ my $bmp180 = Device::SMBus->new(
   I2CBusDevicePath => '/dev/i2c-1',
   I2CDeviceAddress => 0x77,
 );
+
+# Use this constant to enable or disable printing diagnostic data
+
+use constant DIAG			=> False;
 
 # Define a standard list of operating modes for the sensor.
 # These control the number of samples per second that the 
@@ -112,19 +117,21 @@ $cal_MC  = readS16($bmp180,BMP180_CAL_MC);
 $cal_MD  = readS16($bmp180,BMP180_CAL_MD);
 
 # DIAG: Print out the calibration data to validate that we're working up to this point
-print "Calibration Data\n";
-print "----------------\n";
-printf "AC1 = %6d\n",$cal_AC1;
-printf "AC2 = %6d\n",$cal_AC2;
-printf "AC3 = %6d\n",$cal_AC3;
-printf "AC4 = %6d\n",$cal_AC4;
-printf "AC5 = %6d\n",$cal_AC5;
-printf "AC6 = %6d\n",$cal_AC6;
-printf "B1 = %6d\n",$cal_B1;
-printf "B2 = %6d\n",$cal_B2;
-printf "MB = %6d\n",$cal_MB;
-printf "MC = %6d\n",$cal_MC;
-printf "MD = %6d\n",$cal_MD;
+if(DIAG eq "True") {
+	print "Calibration Data\n";
+	print "----------------\n";
+	printf "AC1 = %6d\n",$cal_AC1;
+	printf "AC2 = %6d\n",$cal_AC2;
+	printf "AC3 = %6d\n",$cal_AC3;
+	printf "AC4 = %6d\n",$cal_AC4;
+	printf "AC5 = %6d\n",$cal_AC5;
+	printf "AC6 = %6d\n",$cal_AC6;
+	printf "B1 = %6d\n",$cal_B1;
+	printf "B2 = %6d\n",$cal_B2;
+	printf "MB = %6d\n",$cal_MB;
+	printf "MC = %6d\n",$cal_MC;
+	printf "MD = %6d\n",$cal_MD;
+}
 
 # Read the raw (uncompensated) temperature from the sensor
 
@@ -134,8 +141,10 @@ sub readRawTemp {
 	# usleep takes microseconds, so this is 5 milliseconds
 	usleep(5000);
 	my $rawTemp = readU16($bmp180,BMP180_TEMPDATA);
-	my $temp = $rawTemp & 0xFFFF;
-	printf "Raw Temp: 0x%x (%d)\n", $temp, $rawTemp;
+	if(DIAG eq "True") {
+		my $temp = $rawTemp & 0xFFFF;
+		printf "Raw Temp: 0x%x (%d)\n", $temp, $rawTemp;
+	}
 	return $rawTemp;
 }
 
@@ -161,8 +170,10 @@ sub readRawPressure {
 	my $lsb = $bmp180->readByteData(BMP180_PRESSUREDATA+1);
 	my $xlsb = $bmp180->readByteData(BMP180_PRESSUREDATA+2);
 	my $rawPressure = (($msb << 16) + ($lsb << 8) + $xlsb) >> (8 - $mode);
-	my $press =  $rawPressure & 0xFFFF;
-	printf "Raw Pressure value: 0x%X (%d)\n", $press, $rawPressure;
+	if(DIAG eq "True") {
+		my $press =  $rawPressure & 0xFFFF;
+		printf "Raw Pressure value: 0x%X (%d)\n", $press, $rawPressure;
+	}
 	return $rawPressure;
 }
 
@@ -183,11 +194,10 @@ sub readTemp {
 	$B5 = $X1 + $X2;
 	no integer;
 	$temp = (($B5 + 8) >> 4) / 10.0;
-        my $tmp = $UT & 0xFFFF;
 	return $temp;
 }
 
-# Read the compansated barometric pressure
+# Read the compensated barometric pressure
 
 sub readPressure {
 	my ($bmp180,$mode) = @_;
@@ -201,14 +211,13 @@ sub readPressure {
 	my $B5 = $X1 + $X2;
 	no integer;
 	my $temp = (($B5 + 8) >> 4) / 10.0;
-	#printf "Calibrated temperature = %f C\n", $temp;
 
 	# Calculate compensated pressure
 	use integer;	
 	my $B6 = $B5 - 4000;
-	printf "B6 = $B6\n";
+	#printf "B6 = $B6\n";
 	my $X1 = ($cal_B2 * ($B6 * $B6) >> 12) >> 11;
-	printf "X1 = $X1\n";	
+	#printf "X1 = $X1\n";	
 	my $X2 = ($cal_AC2 * $B6) >> 11;
 	my $X3 = $X1 + $X2;
 	my $B3 = ((($cal_AC1 * 4 + $X3) << $mode) + 2) /4;
@@ -227,7 +236,7 @@ sub readPressure {
 	$X1 = ($X1 * 3038) >> 16;
 	$X2 = (-7357 * $p) >> 16;
 	$p = $p + (($X1 + $X2 + 3791) >> 4);
-	printf "Calibration pressure is %d Pa\n", $p;
+	#printf "Calibration pressure is %d Pa\n", $p;
 	return $p;
 }
 
@@ -243,6 +252,9 @@ sub readPressure {
 my $Temperature = readTemp($bmp180);
 my $Pressure = readPressure($bmp180,BMP180_STANDARD) / 100.0;
 
-printf "Temperature: %f C\n", $Temperature;
-printf "Pressure: %f hPa\n", $Pressure;
+my $TemperatureF = (($Temperature * 9) / 5) + 32;
+
+printf "Temperature: %.2f C\n", $Temperature;
+printf "Temperature: %.2f F\n", $TemperatureF;
+printf "Pressure: %.2f hPa\n", $Pressure;
 
