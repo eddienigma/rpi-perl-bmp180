@@ -146,23 +146,23 @@ sub readRawPressure {
 	my $writeVal = BMP180_READPRESSURECMD + ($mode << 6);
 	$bmp180->writeByteData(BMP180_CONTROL,$writeVal);
 	if ($mode == BMP180_ULTRALOWPOWER) {
-		usleep(5);
+		usleep(5000);
 	}
 	elsif ($mode == BMP180_HIRES) {
-		usleep(14);
+		usleep(14000);
 	}
 	elsif ($mode == BMP180_ULTRAHIRES) {
-		usleep(26);
+		usleep(26000);
 	}
 	else {
-		usleep(8);
+		usleep(8000);
 	}
 	my $msb = $bmp180->readByteData(BMP180_PRESSUREDATA);
 	my $lsb = $bmp180->readByteData(BMP180_PRESSUREDATA+1);
 	my $xlsb = $bmp180->readByteData(BMP180_PRESSUREDATA+2);
 	my $rawPressure = (($msb << 16) + ($lsb << 8) + $xlsb) >> (8 - $mode);
 	my $press =  $rawPressure & 0xFFFF;
-	printf "Raw pressure value is 0x%X (%d)\n", $press, $rawPressure;
+	printf "Raw Pressure value: 0x%X (%d)\n", $press, $rawPressure;
 	return $rawPressure;
 }
 
@@ -176,11 +176,6 @@ sub readTemp {
 	my $B5 = 0;
 	my $temp = 0.0;
 
-	printf "AC5 = %6d\n",$cal_AC5;
-	printf "AC6 = %6d\n",$cal_AC6;
-	printf "MC = %6d\n",$cal_MC;
-	printf "MD = %6d\n",$cal_MD;
-	
 	$UT = readRawTemp($bmp180);
 	use integer;
 	$X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
@@ -189,8 +184,6 @@ sub readTemp {
 	no integer;
 	$temp = (($B5 + 8) >> 4) / 10.0;
         my $tmp = $UT & 0xFFFF;
-        printf "Raw Tmp: 0x%x (%d)\n", $tmp, $UT;
-	printf "temp var is %f\n", $temp;
 	return $temp;
 }
 
@@ -198,23 +191,13 @@ sub readTemp {
 
 sub readPressure {
 	my ($bmp180,$mode) = @_;
-	my $UT = readRawTemp($bmp180);
 	my $UP = readRawPressure($bmp180,$mode);
-
-	# Calculate true temperature, but don't convert to simple output format yet
-	use integer;
-	my $X1 = (($UT - $cal_AC6) * $cal_AC5) >> 15;
-	my $X2 = ($cal_MC << 11) / ($X1 + $cal_MD);
-	my $B5 = $X1 + $X2;
-	no integer;
-	my $temp = (($B5 + 8) >> 4) / 10.0;
-	printf "Calibrated temperature = %f C\n", $temp;
 
 	# Calculate compensated pressure
 	use integer;	
 	my $B6 = $B5 - 4000;
-	$X1 = ($cal_B2 * ($B6 * $B6) >> 12) >> 11;
-	$X2 = ($cal_AC2 * $B6) >> 11;
+	my $X1 = ($cal_B2 * ($B6 * $B6) >> 12) >> 11;
+	my $X2 = ($cal_AC2 * $B6) >> 11;
 	my $X3 = $X1 + $X2;
 	my $B3 = ((($cal_AC1 * 4 + $X3) << $mode) + 2) /4;
 	$X1 = ($cal_AC3 * $B6) >> 13;
@@ -246,9 +229,8 @@ sub readPressure {
 
 # Call the compensated pressure function to print barometric pressure
 my $Temperature = readTemp($bmp180);
-my $Pressure = readPressure($bmp180,BMP180_STANDARD);
+my $Pressure = readPressure($bmp180,BMP180_STANDARD) / 100.0;
 
 printf "Temperature: %f C\n", $Temperature;
-my $Pressure /= 100.0;
 printf "Pressure: %f hPa\n", $Pressure;
 
